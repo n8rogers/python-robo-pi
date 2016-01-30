@@ -1,0 +1,163 @@
+# Ardumote.py
+# 
+# A quick python script to control a Raspberry Pi (running Debian Wheezy aka Raspbian) from iPhone using the Ardumote/HD App.
+# Download the App Here:  (iPhone Version)  http://bit.ly/PoChFK
+#  			  (iPad Version)  http://bit.ly/S8RUmv
+#
+# INSTRUCTIONS:
+# This script requires you to first install the GPIO Library in Raspbian (Debian Wheezy):
+#		1) SSH into your Raspberry Pi
+#		2) Get and install the GPIO Library:
+#				 ~$ sudo apt-get install rpi.gpio
+#		3) Copy this script to your Pi or directly download it to the Pi:
+#				 ~$ wget http://samratamin.com/RaspPi/Ardumote
+#		3) after installing the library, run this python script:  
+#				 ~$ sudo nice -n 10 python Ardumote
+#				* Note the "nice -n 10" sets process priority.  If operations are very important, use a lower number than 10)
+#		4) Configure the messages on the Ardumote app and enjoy!
+#
+#		5) Modify/Handle Messages in this script and control anything else you want!
+#
+# Samrat Amin, 2012
+# 
+
+import socket
+import RPi.GPIO as GPIO
+import os
+
+GPIO.setmode(GPIO.BCM)  #Set Pin Mode according to Board Layout
+
+#-----------------------------------------------------------------------------
+# GPIO Pins SETUP
+
+#Outputs in Pin Number for P1 Header.  For example, GPIO.setup(7, GPIO.OUT) is for P1-07 (GPIO 4)
+
+motor1 = [4, 17]
+motor2 = [23, 24]
+
+
+#GPIO.setup(3, GPIO.OUT)   
+#GPIO.setup(5, GPIO.OUT)   
+#GPIO.setup(7, GPIO.OUT)   
+#GPIO.setup(8, GPIO.OUT)   
+#GPIO.setup(10, GPIO.OUT)
+GPIO.setup(motor1[0], GPIO.OUT)   
+GPIO.setup(motor1[1], GPIO.OUT)    	
+GPIO.setup(motor2[0], GPIO.OUT)   
+GPIO.setup(motor2[1], GPIO.OUT)   
+
+
+#Inputs
+
+
+#-----------------------------------------------------------------------------
+
+#Functions
+
+def _left():
+    print "Left"
+    forward(motor2)
+    backward(motor1)
+
+def _right(): 
+    print "Right"
+    forward(motor1)
+    backward(motor2)
+
+def _forward():
+    print "Forward"
+    forward(motor1)
+    forward(motor2)
+
+def _backward():
+    print "Backward"
+    backward(motor1)
+    backward(motor2)
+
+def stop():
+    controller(motor1,[False,False])
+    controller(motor2,[False,False])
+    
+def forward(motor):
+    controller(motor,[True,False])
+
+def backward(motor):
+    controller(motor,[False,True])
+    
+def controller(motor, power):
+    if not len(motor)==len(power):
+        print "Error!"
+    else:
+        for x in range(0,len(motor)):
+            GPIO.output(motor[x],power[x])
+
+#-----------------------------------------------------------------------------
+
+RxSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+TxSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+IP = '0.0.0.0'
+InPort = 7777
+OutPort = 7777
+
+
+RxSock.bind((IP,InPort))
+
+while True:
+	data = RxSock.recvfrom(512)
+	message = data[0]
+	senderinfo = data[1]
+	senderIP = senderinfo[0]
+	print "message received: ", message
+#	print "message length: ", len(message)
+#	print "sender's IP: ", senderIP
+	
+#-----------------------------------------------------------------------------
+
+	# Handle Messages for Shutdown & Reboot	
+	
+	if (message == 'Reboot'):
+		print "Rebooting System"
+		TxSock.sendto('Rebooting System...',(senderIP,OutPort))
+
+		os.system('reboot')
+
+	if (message == 'Shutdown'):
+		print "Shutting System Down Now..."
+		TxSock.sendto('Shutting System Down...',(senderIP,OutPort))
+
+		os.system('sudo shutdown now -h')
+
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+
+	# Handle Messages for GPIO Pins	
+	if message == 'forwardH':
+        	_forward()
+
+	if message == 'forwardL':
+		stop()
+    
+	if message == 'back':
+        	_backward()
+    
+	if message == 'left':
+        	_left()
+    
+	if message == 'right':
+        	_right()
+        
+		#PIN 3
+	#if (message == 'P3H'):
+	#	print "Pin 3 is now High"
+	#	GPIO.output(3, True)
+	#	TxSock.sendto('Pin 3 is now High',(senderIP,OutPort))
+
+	#elif (message == 'P3L'):
+ 	#	print "Pin 3 is now Low"
+	#	GPIO.output(3, False)
+	#	TxSock.sendto('Pin 3 is now Low',(senderIP,OutPort))
+
+		
+#-----------------------------------------------------------------------------
